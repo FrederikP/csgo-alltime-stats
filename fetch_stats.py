@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 import re
 
 import json
+import getpass
 
 options = webdriver.ChromeOptions()
 
@@ -31,7 +32,7 @@ try:
     
     user_name = input('Enter user name: ')
     user_field.send_keys(user_name)
-    password = input('Enter password: ')
+    password = getpass.getpass('Enter password (will not be echoed): ')
     password_field.send_keys(password)
     sign_in_button.click()
 
@@ -47,7 +48,7 @@ try:
                 )
                 two_factor_button = driver.find_element_by_css_selector('#login_twofactorauth_buttonset_entercode > div.auth_button.leftbtn')
 
-                two_factor_token = input('Enter two factor token: ')
+                two_factor_token = input('Enter two factor token: ').upper()
                 two_factor_field.send_keys(two_factor_token)
 
                 two_factor_button.click()
@@ -60,7 +61,7 @@ try:
                     )
                     auth_code_button = driver.find_element_by_css_selector('#auth_buttonset_entercode > div.auth_button.leftbtn')
 
-                    auth_code = input('Enter auth code: ')
+                    auth_code = input('Enter auth code: ').upper()
                     auth_code_field.send_keys(auth_code)
 
                     auth_code_button.click()
