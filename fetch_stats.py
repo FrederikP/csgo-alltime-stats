@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -23,8 +25,6 @@ login_Page = 'https://steamcommunity.com/login/home/'
 driver.get(login_Page)
 
 try:
-    driver.implicitly_wait(30)
-
     user_field = driver.find_element_by_id('steamAccountName')
     password_field = driver.find_element_by_id('steamPassword')
     sign_in_button = driver.find_element_by_id('SteamLogin')
@@ -35,22 +35,45 @@ try:
     password_field.send_keys(password)
     sign_in_button.click()
 
-    try:
-        two_factor_field = WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located((By.ID, 'twofactorcode_entry'))
-        )
-        two_factor_button = driver.find_element_by_css_selector('#login_twofactorauth_buttonset_entercode > div.auth_button.leftbtn')
+    logged_in = False
+    while not logged_in:
+        try:
+            WebDriverWait(driver, 0.5).until(EC.visibility_of_element_located((By.CLASS_NAME, 'profile_header')))
+            logged_in = True
+        except TimeoutException:
+            try:
+                two_factor_field = WebDriverWait(driver, 0.5).until(
+                    EC.visibility_of_element_located((By.ID, 'twofactorcode_entry'))
+                )
+                two_factor_button = driver.find_element_by_css_selector('#login_twofactorauth_buttonset_entercode > div.auth_button.leftbtn')
 
-        two_factor_token = input('Enter two factor token: ')
-        two_factor_field.send_keys(two_factor_token)
+                two_factor_token = input('Enter two factor token: ')
+                two_factor_field.send_keys(two_factor_token)
 
-        two_factor_button.click()
+                two_factor_button.click()
+                logged_in = True
 
-        
+            except TimeoutException:
+                try:
+                    auth_code_field = WebDriverWait(driver, 0.5).until(
+                        EC.visibility_of_element_located((By.ID, 'authcode'))
+                    )
+                    auth_code_button = driver.find_element_by_css_selector('#auth_buttonset_entercode > div.auth_button.leftbtn')
+
+                    auth_code = input('Enter auth code: ')
+                    auth_code_field.send_keys(auth_code)
+
+                    auth_code_button.click()
+
+                    continue_button = WebDriverWait(driver, 20).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, '#success_continue_btn > div.auth_button_h3'))
+                    )
+                    continue_button.click()
+                    logged_in = True
+                except TimeoutException:
+                    pass
     
-    except TimeoutException as e:
-        print(e)
-    
+    print('Logged in. Waiting for profile to grab cookieeeeees')
     WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.CLASS_NAME, 'profile_header')))
 
     url_prefix = driver.current_url
@@ -101,7 +124,10 @@ all_player_scores = []
 all_player_scores.extend(parse_table(first_page))
 
 match = re.search(r"var g_sGcContinueToken = '([0-9]*)';", first_page)
-continue_token = match.group(1)
+if match:
+    continue_token = match.group(1)
+else:
+    continue_token = None
 
 while continue_token:
     next_url = url_prefix + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)

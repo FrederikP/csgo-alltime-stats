@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import json
 
 from itertools import groupby
@@ -16,7 +18,7 @@ for key, group in groupby(sorted_by_name, key=lambda x: x['Player Name']):
         'K/D': '{:.1%}'.format(sum(int(entry['K']) for entry in group) / sum(int(entry['D']) for entry in group))
     }
 
-top10 = sorted(aggregated.items(), key=lambda x: x[1]['Number of Matches'], reverse=True)[:10]
+sorted_by_number_matches = sorted(aggregated.items(), key=lambda x: x[1]['Number of Matches'], reverse=True)
 
-for entry in top10:
+for entry in sorted_by_number_matches[:10]:
     print('{} -> Number of Matches: {}, K/D : {}'.format(entry[0], entry[1]['Number of Matches'], entry[1]['K/D']))
