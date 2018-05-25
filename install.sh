@@ -3,7 +3,7 @@
 virtualenv venv
 . venv/bin/activate
 
-pip install requests selenium beautifulsoup4
+pip install requests selenium beautifulsoup4 dotmap
 
 PLATFORM=linux64
 VERSION=$(curl http://chromedriver.storage.googleapis.com/LATEST_RELEASE)

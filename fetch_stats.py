@@ -1,19 +1,17 @@
 from __future__ import print_function
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
-
-import requests
-
-from bs4 import BeautifulSoup
-
+import getpass
+import json
 import re
 
-import json
-import getpass
+import requests
+from bs4 import BeautifulSoup
+from dotmap import DotMap
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 options = webdriver.ChromeOptions()
 
@@ -97,32 +95,59 @@ response = requests.get(initial_url, headers=headers)
 
 first_page = response.text
 
+def parse_players(rows):
+    players = []
+    for row in rows:
+        player = DotMap() 
+        columns = row.find_all('td')
+        player.name = columns[0].get_text().strip()
+        player.ping = int(columns[1].get_text())
+        player.kills = int(columns[2].get_text())
+        player.assists = int(columns[3].get_text())
+        player.deaths = int(columns[4].get_text())
+        stars = columns[5].get_text().strip()
+        if not stars:
+            player.stars = 0
+        elif len(stars) == 1:
+            player.stars = 1
+        else:
+            player.stars = int(stars[1])
+        player.hsp = int(columns[6].get_text().strip('%'))
+        player.score = int(columns[7].get_text())
+        players.append(player)
+    return players
+
 def parse_table(html_doc):
     soup = BeautifulSoup(html_doc, 'html.parser')
 
+    map_tables = soup.find_all('table', {'class': 'csgo_scoreboard_inner_left'})
     score_tables = soup.find_all('table', {'class': 'csgo_scoreboard_inner_right'})
 
-    player_scores = []
+    maps = []
 
-    for score_table in score_tables:
-        rows = score_table.find_all('tr')
+    for idx in range(len(map_tables)):
+        map_data = DotMap()
+        map_table = map_tables[idx]
+        map_rows = map_table.find_all('td')
+        map_data.map = map_rows[0].get_text().lower().replace('competitive', '').strip()
+        map_data.date = map_rows[1].get_text().strip()
+        map_data.wait_time = map_rows[2].get_text().lower().replace('wait time:', '').strip()
+        map_data.match_duration = map_rows[3].get_text().lower().replace('match duration:', '').strip()
 
-        headers = []
+        score_table = score_tables[idx]
+        score_rows = score_table.find_all('tr')
+        game_score = score_rows[6].find('td').get_text()
+        team_1_score, team_2_score = game_score.split(' : ')
+        map_data.team1.score = int(team_1_score)
+        map_data.team1.players = parse_players(score_rows[1:6])
+        map_data.team2.score = int(team_2_score)
+        map_data.team2.players = parse_players(score_rows[7:])
 
-        for column in rows[0].find_all('th'):
-            headers.append(column.get_text())
+        maps.append(map_data)
+    return maps
 
-        for row in rows[1:]:
-            player_score = {}
-            columns = row.find_all('td')
-            if len(columns) > 1:
-                for idx, column in enumerate(columns):
-                    player_score[headers[idx]] = column.get_text().strip()
-                player_scores.append(player_score)
-    return player_scores
-
-all_player_scores = []
-all_player_scores.extend(parse_table(first_page))
+all_maps = []
+all_maps.extend(parse_table(first_page))
 
 match = re.search(r"var g_sGcContinueToken = '([0-9]*)';", first_page)
 if match:
@@ -139,14 +164,14 @@ while continue_token:
         break
     html = as_json['html']
 
-    all_player_scores.extend(parse_table(html))
+    all_maps.extend(parse_table(html))
 
     if 'continue_token' in as_json:
         continue_token = as_json['continue_token']
     else:
         break
 
-print('Saving {0} scores.'.format(len(all_player_scores)))
+print('Saving data of {0} maps.'.format(len(all_maps)))
 
-with open('playerscores.json', 'w') as playerscores_file:
-    json.dump(all_player_scores, playerscores_file)
+with open('all_maps.json', 'w') as all_maps_file:
+    json.dump(all_maps, all_maps_file)
