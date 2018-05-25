@@ -4,6 +4,12 @@ Script for fetching and aggregating your matchmaking data using this official fe
 
 https://www.reddit.com/r/GlobalOffensive/comments/8lyzb6/so_the_steam_client_has_been_keeping_track_of/
 
+## Security
+
+The tool will ask you for user name, password (and 2 factor auth). The data is only used to login to the site
+using a headless browser and to grab the cookie data. The code is completely open source and quite compact, so
+have a look for yourself.
+
 ## Requirements
 
 - Python + pip + virtualenv are installed
