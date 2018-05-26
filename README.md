@@ -34,7 +34,7 @@ On Windows you can also try WSFL.
 
 Enter user name password and steam guardtwo factor code or email auth code.
 
-Raw stats will be in playerscores.json
+Raw stats will be in all_maps.json
 
 `python aggregate_stats.py`
 
