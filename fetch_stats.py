@@ -123,7 +123,11 @@ def parse_players(rows):
             player.stars = 1
         else:
             player.stars = int(stars[1])
-        player.hsp = int(columns[6].get_text().strip('%'))
+        hsp = columns[6].get_text().strip()
+        if not hsp:
+            player.hsp = 0
+        else:
+            player.hsp = int(columns[6].get_text().strip().strip('%'))
         player.score = int(columns[7].get_text())
         players.append(player)
     return players
@@ -186,3 +190,4 @@ print('Saving data of {0} maps.'.format(len(all_maps)))
 
 with open('all_maps.json', 'w') as all_maps_file:
     json.dump(all_maps, all_maps_file)
+
