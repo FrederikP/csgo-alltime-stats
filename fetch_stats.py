@@ -3,6 +3,7 @@ from __future__ import print_function
 import getpass
 import json
 import re
+import sys
 
 import requests
 from bs4 import BeautifulSoup
@@ -23,17 +24,7 @@ login_Page = 'https://steamcommunity.com/login/home/'
 
 driver.get(login_Page)
 
-try:
-    user_field = driver.find_element_by_id('steamAccountName')
-    password_field = driver.find_element_by_id('steamPassword')
-    sign_in_button = driver.find_element_by_id('SteamLogin')
-    
-    user_name = input('Enter user name: ')
-    user_field.send_keys(user_name)
-    password = getpass.getpass('Enter password (will not be echoed): ')
-    password_field.send_keys(password)
-    sign_in_button.click()
-
+def handle_login_branches():
     logged_in = False
     while not logged_in:
         try:
@@ -70,7 +61,27 @@ try:
                     continue_button.click()
                     logged_in = True
                 except TimeoutException:
-                    pass
+                    try:
+                        error_display = WebDriverWait(driver, 0.5).until(
+                            EC.visibility_of_element_located((By.ID, 'error_display'))
+                        )
+                        print('Got error message when trying to login: {}'.format(error_display.text))
+                        sys.exit(1)
+                    except TimeoutException:
+                        pass
+
+try:
+    user_field = driver.find_element_by_id('steamAccountName')
+    password_field = driver.find_element_by_id('steamPassword')
+    sign_in_button = driver.find_element_by_id('SteamLogin')
+    
+    user_name = input('Enter user name: ')
+    user_field.send_keys(user_name)
+    password = getpass.getpass('Enter password (will not be echoed): ')
+    password_field.send_keys(password)
+    sign_in_button.click()
+
+    handle_login_branches()
     
     print('Logged in. Waiting for profile to grab cookieeeeees')
     WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.CLASS_NAME, 'profile_header')))
