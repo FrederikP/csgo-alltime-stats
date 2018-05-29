@@ -8,93 +8,60 @@ import sys
 import requests
 from bs4 import BeautifulSoup
 from dotmap import DotMap
-from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 
-options = webdriver.ChromeOptions()
+from base64 import b64encode
 
-options.add_argument('headless')
+from Crypto.PublicKey.RSA import construct
 
-driver = webdriver.Chrome(chrome_options=options)
+user_name = input('Enter user name: ')
+password = getpass.getpass('Enter password (will not be echoed): ')
 
-login_Page = 'https://steamcommunity.com/login/home/'
+def get_encrypted_password(user):
+    rsa_key_response = DotMap(requests.post('https://steamcommunity.com/login/home/getrsakey/', data={ 'username': user }).json())
 
-driver.get(login_Page)
+    e = int(rsa_key_response.publickey_exp, 16)
+    n = int(rsa_key_response.publickey_mod, 16)
+    pubkey = construct((n, e))
 
-def handle_login_branches():
-    logged_in = False
-    while not logged_in:
-        try:
-            WebDriverWait(driver, 0.5).until(EC.visibility_of_element_located((By.CLASS_NAME, 'profile_header')))
-            logged_in = True
-        except TimeoutException:
-            try:
-                two_factor_field = WebDriverWait(driver, 0.5).until(
-                    EC.visibility_of_element_located((By.ID, 'twofactorcode_entry'))
-                )
-                two_factor_button = driver.find_element_by_css_selector('#login_twofactorauth_buttonset_entercode > div.auth_button.leftbtn')
+    encrypted = pubkey.encrypt(password.encode('utf-8'))
+    encoded = b64encode(encrypted)
+    return encoded, rsa_key_response.timestamp
 
-                two_factor_token = input('Enter two factor token: ').upper()
-                two_factor_field.send_keys(two_factor_token)
+encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name)
 
-                two_factor_button.click()
-                logged_in = True
+params = DotMap()
+params.password = encoded_encrypted_password
+params.username = user_name
+params.rsatimestamp = rsa_timestamp
 
-            except TimeoutException:
-                try:
-                    auth_code_field = WebDriverWait(driver, 0.5).until(
-                        EC.visibility_of_element_located((By.ID, 'authcode'))
-                    )
-                    auth_code_button = driver.find_element_by_css_selector('#auth_buttonset_entercode > div.auth_button.leftbtn')
+login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params).json())
 
-                    auth_code = input('Enter auth code: ').upper()
-                    auth_code_field.send_keys(auth_code)
+if login_response.requires_twofactor:
+    token = input('Enter steam guard code: ')
+    params.twofactorcode = token
+    encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name)
+    params.password = encoded_encrypted_password
+    params.rsatimestamp = rsa_timestamp
+    login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params).json())
 
-                    auth_code_button.click()
+if login_response.emailauth_needed:
+    token = input('Enter email auth code: ')
+    params.emailauth = token
+    login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params).json())
 
-                    continue_button = WebDriverWait(driver, 20).until(
-                        EC.visibility_of_element_located((By.CSS_SELECTOR, '#success_continue_btn > div.auth_button_h3'))
-                    )
-                    continue_button.click()
-                    logged_in = True
-                except TimeoutException:
-                    try:
-                        error_display = WebDriverWait(driver, 0.5).until(
-                            EC.visibility_of_element_located((By.ID, 'error_display'))
-                        )
-                        print('Got error message when trying to login: {}'.format(error_display.text))
-                        sys.exit(1)
-                    except TimeoutException:
-                        pass
+if login_response.success:
+    print('Logged in!')
+else:
+    print('Failed to log in with message: {0}'.format(login_response.message))
+    sys.exit(1)
 
-try:
-    user_field = driver.find_element_by_id('steamAccountName')
-    password_field = driver.find_element_by_id('steamPassword')
-    sign_in_button = driver.find_element_by_id('SteamLogin')
-    
-    user_name = input('Enter user name: ')
-    user_field.send_keys(user_name)
-    password = getpass.getpass('Enter password (will not be echoed): ')
-    password_field.send_keys(password)
-    sign_in_button.click()
+login_response.pprint()
 
-    handle_login_branches()
-    
-    print('Logged in. Waiting for profile to grab cookieeeeees')
-    WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.CLASS_NAME, 'profile_header')))
 
-    url_prefix = driver.current_url
+cookies_all = '; '.join(['{0}={1}'.format(cookie['name'], cookie['value']) for cookie in cookies])
 
-    cookies = driver.get_cookies()
+sessionid = [cookie['value'] for cookie in cookies if cookie['name'].lower() == 'sessionid']
 
-    cookies_all = '; '.join(['{0}={1}'.format(cookie['name'], cookie['value']) for cookie in cookies])
-
-    sessionid = [cookie['value'] for cookie in cookies if cookie['name'].lower() == 'sessionid']
-finally:
-    driver.quit()
 
 headers = {
     'Cookie': cookies_all
@@ -190,4 +157,3 @@ print('Saving data of {0} maps.'.format(len(all_maps)))
 
 with open('all_maps.json', 'w') as all_maps_file:
     json.dump(all_maps, all_maps_file)
-
