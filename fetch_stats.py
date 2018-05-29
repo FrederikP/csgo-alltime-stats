@@ -12,42 +12,50 @@ from dotmap import DotMap
 from base64 import b64encode
 
 from Crypto.PublicKey.RSA import construct
+from Crypto.Cipher import PKCS1_v1_5
 
 user_name = input('Enter user name: ')
 password = getpass.getpass('Enter password (will not be echoed): ')
 
-def get_encrypted_password(user):
+def get_encrypted_password(user, password):
     rsa_key_response = DotMap(requests.post('https://steamcommunity.com/login/home/getrsakey/', data={ 'username': user }).json())
 
     e = int(rsa_key_response.publickey_exp, 16)
     n = int(rsa_key_response.publickey_mod, 16)
     pubkey = construct((n, e))
-
-    encrypted = pubkey.encrypt(password.encode('utf-8'))
+    cipher = PKCS1_v1_5.new(pubkey)
+    encrypted = cipher.encrypt(password.encode('utf-8'))
+    print(repr(encrypted))
     encoded = b64encode(encrypted)
     return encoded, rsa_key_response.timestamp
 
-encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name)
+encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name, password)
 
 params = DotMap()
 params.password = encoded_encrypted_password
 params.username = user_name
 params.rsatimestamp = rsa_timestamp
+params.twofactorcode = ''
+params.emailauth = ''
+params.loginfriendlyname = ''
+params.captchagid = '-1'
+params.emailsteamid = ''
+params.remember_login = 'false'
 
-login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params).json())
+login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
 
 if login_response.requires_twofactor:
     token = input('Enter steam guard code: ')
     params.twofactorcode = token
-    encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name)
+    encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name, password)
     params.password = encoded_encrypted_password
     params.rsatimestamp = rsa_timestamp
-    login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params).json())
+    login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
 
 if login_response.emailauth_needed:
     token = input('Enter email auth code: ')
     params.emailauth = token
-    login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params).json())
+    login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
 
 if login_response.success:
     print('Logged in!')
