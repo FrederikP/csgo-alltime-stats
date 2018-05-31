@@ -4,80 +4,108 @@ import getpass
 import json
 import re
 import sys
+from base64 import b64encode
 
 import requests
+import rsa
 from bs4 import BeautifulSoup
 from dotmap import DotMap
 
-from base64 import b64encode
-
-from Crypto.PublicKey.RSA import construct
-from Crypto.Cipher import PKCS1_v1_5
-
-user_name = input('Enter user name: ')
-password = getpass.getpass('Enter password (will not be echoed): ')
+cookie_file_name = '.cookie'
 
 def get_encrypted_password(user, password):
     rsa_key_response = DotMap(requests.post('https://steamcommunity.com/login/home/getrsakey/', data={ 'username': user }).json())
-
     e = int(rsa_key_response.publickey_exp, 16)
     n = int(rsa_key_response.publickey_mod, 16)
-    pubkey = construct((n, e))
-    cipher = PKCS1_v1_5.new(pubkey)
-    encrypted = cipher.encrypt(password.encode('utf-8'))
-    print(repr(encrypted))
+    pubkey = rsa.PublicKey(n, e)
+    encrypted = rsa.encrypt(password.encode('utf-8'), pubkey)
     encoded = b64encode(encrypted)
     return encoded, rsa_key_response.timestamp
 
-encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name, password)
+def login():
+    user_name = input('Enter user name: ')
+    password = getpass.getpass('Enter password (will not be echoed): ')
 
-params = DotMap()
-params.password = encoded_encrypted_password
-params.username = user_name
-params.rsatimestamp = rsa_timestamp
-params.twofactorcode = ''
-params.emailauth = ''
-params.loginfriendlyname = ''
-params.captchagid = '-1'
-params.emailsteamid = ''
-params.remember_login = 'false'
-
-login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
-
-if login_response.requires_twofactor:
-    token = input('Enter steam guard code: ')
-    params.twofactorcode = token
     encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name, password)
+
+    params = DotMap()
     params.password = encoded_encrypted_password
+    params.username = user_name
     params.rsatimestamp = rsa_timestamp
+    params.twofactorcode = ''
+    params.emailauth = ''
+    params.loginfriendlyname = ''
+    params.captchagid = '-1'
+    params.emailsteamid = ''
+    params.remember_login = 'true'
+
     login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
 
-if login_response.emailauth_needed:
-    token = input('Enter email auth code: ')
-    params.emailauth = token
-    login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
+    if login_response.requires_twofactor:
+        token = input('Enter steam guard code: ')
+        params.twofactorcode = token
+        encoded_encrypted_password, rsa_timestamp = get_encrypted_password(user_name, password)
+        params.password = encoded_encrypted_password
+        params.rsatimestamp = rsa_timestamp
+        login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
 
-if login_response.success:
-    print('Logged in!')
-else:
-    print('Failed to log in with message: {0}'.format(login_response.message))
-    sys.exit(1)
+    if login_response.emailauth_needed:
+        token = input('Enter email auth code: ')
+        params.emailauth = token
+        login_response = DotMap(requests.post('https://steamcommunity.com/login/home/dologin/', data=params.toDict()).json())
 
-login_response.pprint()
+    if login_response.login_complete:
+        print('Logged in!')
+    else:
+        print('Failed to log in with message: {0}'.format(login_response.message))
+        sys.exit(1)
+
+    with open(cookie_file_name, 'w') as cookie_file:
+        json.dump(login_response, cookie_file)
+
+def get_initial_page():
+    with open(cookie_file_name) as cookie_file:
+        login_data = DotMap(json.load(cookie_file))
+
+    steamid = login_data.transfer_parameters.steamid
+    cookies = []
+    sessionid = login_data.transfer_parameters.auth
+    cookies.append({
+        'name': 'sessionid',
+        'value': sessionid
+    })
+    cookies.append({
+        'name': 'steamLogin',
+        'value': steamid + '%7C%7C' + login_data.transfer_parameters.token
+    })
+    cookies.append({
+        'name': 'steamLoginSecure',
+        'value': steamid + '%7C%7C' + login_data.transfer_parameters.token_secure
+    })
 
 
-cookies_all = '; '.join(['{0}={1}'.format(cookie['name'], cookie['value']) for cookie in cookies])
+    cookies_all = '; '.join(['{0}={1}'.format(cookie['name'], cookie['value']) for cookie in cookies])
 
-sessionid = [cookie['value'] for cookie in cookies if cookie['name'].lower() == 'sessionid']
+    sessionid = [cookie['value'] for cookie in cookies if cookie['name'].lower() == 'sessionid']
 
 
-headers = {
-    'Cookie': cookies_all
-}
+    headers = {
+        'Cookie': cookies_all
+    }
 
-initial_url = url_prefix + '/gcpd/730/?tab=matchhistorycompetitive'
+    initial_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730/?tab=matchhistorycompetitive'
 
-response = requests.get(initial_url, headers=headers)
+    response = requests.get(initial_url, headers=headers)
+    return response, headers, sessionid, steamid
+needs_login = False
+try:
+    response, headers, sessionid, steamid = get_initial_page()
+except FileNotFoundError:
+    needs_login = True
+
+if needs_login or response.status_code != 200:
+    login()
+    response, headers, sessionid, steamid = get_initial_page()
 
 first_page = response.text
 
@@ -146,7 +174,7 @@ else:
     continue_token = None
 
 while continue_token:
-    next_url = url_prefix + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)
+    next_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)
     print('Loading next page...')
     response = requests.get(next_url, headers=headers)
     as_json = response.json()

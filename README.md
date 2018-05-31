@@ -7,26 +7,20 @@ https://www.reddit.com/r/GlobalOffensive/comments/8lyzb6/so_the_steam_client_has
 ## Security
 
 The tool will ask you for user name, password (and 2 factor auth). The data is only used to login to the site
-using a headless browser and to grab the cookie data. The code is completely open source and quite compact, so
-have a look for yourself.
+and to grab the cookie data. The code is completely open source and quite compact, so have a look for yourself.
 
 ## Requirements
 
-- Python + pip + virtualenv are installed
+- Python + pip are installed
 - Chrome browser is installed
 
 ## Installation
 
 Clone this repository.
 
-On Linux go to projects folder and run
+Install dependencies. I recommend using virtualenv to create a dedicated environment.
 
-`./install.sh`
-
-The script will download selenium web driver for chrome, setup virtualenv and and install required packages
-
-On mac you can replace the platform with mac64. On windows you can use win32 and cygwin/mingw or write your own .bat
-On Windows you can also try WSFL.
+`pip install requests rsa beautifulsoup4 dotmap`
 
 ## Usage
 
