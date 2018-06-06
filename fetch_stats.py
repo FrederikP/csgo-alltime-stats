@@ -95,7 +95,7 @@ def get_initial_page():
 
     initial_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730/?tab=matchhistorycompetitive'
 
-    response = requests.get(initial_url, headers=headers)
+    response = requests.get(initial_url, headers=headers, allow_redirects=False)
     return response, headers, sessionid, steamid
 needs_login = False
 try:
