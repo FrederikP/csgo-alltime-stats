@@ -66,7 +66,6 @@ def login():
 def get_initial_page():
     with open(cookie_file_name) as cookie_file:
         login_data = DotMap(json.load(cookie_file))
-    print(login_data)
     steamid = login_data.transfer_parameters.steamid
     cookies = []
     sessionid = login_data.transfer_parameters.auth
@@ -114,7 +113,9 @@ def parse_players(rows):
     for row in rows:
         player = DotMap() 
         columns = row.find_all('td')
-        player.name = columns[0].get_text().strip()
+        player_column = columns[0]
+        player.name = player_column.get_text().strip()
+        player.id = player_column.find('a')['href'].split('/')[-1]
         player.ping = int(columns[1].get_text())
         player.kills = int(columns[2].get_text())
         player.assists = int(columns[3].get_text())

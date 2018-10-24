@@ -1,5 +1,6 @@
 .vscode/
-all_maps.json
+*.json
+__pycache__
 venv/
 .cookie
 *.html
