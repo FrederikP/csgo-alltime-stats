@@ -66,7 +66,7 @@ def login():
 def get_initial_page():
     with open(cookie_file_name) as cookie_file:
         login_data = DotMap(json.load(cookie_file))
-
+    print(login_data)
     steamid = login_data.transfer_parameters.steamid
     cookies = []
     sessionid = login_data.transfer_parameters.auth
@@ -76,7 +76,7 @@ def get_initial_page():
     })
     cookies.append({
         'name': 'steamLogin',
-        'value': steamid + '%7C%7C' + login_data.transfer_parameters.token
+        'value': steamid + '%7C%7C' + login_data.transfer_parameters.auth
     })
     cookies.append({
         'name': 'steamLoginSecure',
