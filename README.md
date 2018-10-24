@@ -12,7 +12,6 @@ and to grab the cookie data. The code is completely open source and quite compac
 ## Requirements
 
 - Python + pip are installed
-- Chrome browser is installed
 
 ## Installation
 
@@ -34,6 +33,24 @@ Raw stats will be in all_maps.json
 
 Will show a simple overview of the 10 players with most matches (you (and your friends)).
 **This is very much work in progress**
+
+## Checking bans in all players you have played with
+
+```
+python fetch_stats.py
+python resolve_players.py
+python check_bans.py
+```
+The second and third steps require you to have a steam api key, that can easily be retrieved from steam.
+
+The output will look like this:
+
+```
+Total players in my games: 3915
+Players with VAC bans: 381
+Players with game bans: 85
+```
+For now these include all bans (not necessarily csgo).
 
 ## Example output
 
