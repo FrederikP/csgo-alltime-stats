@@ -19,15 +19,21 @@ Clone this repository.
 
 Install dependencies. I recommend using virtualenv to create a dedicated environment.
 
-`pip install requests rsa beautifulsoup4 dotmap`
+`pip install requests rsa beautifulsoup4 dotmap progressbar2 tinydb`
 
-## Usage
+## Fetching data
 
 `python fetch_stats.py`
 
-Enter user name password and steam guardtwo factor code or email auth code.
+Enter api key, username, password and steam guard two factor code or email auth code.
+A progress bar will be shown, because the first time you run this, this can take a while.
+Some player id resolving is performed, so that bans can be easliy looked up later.
+Consecutive calls will try to reuse data entered and fetched before 
+(api key, login cookie are also stored, but cookie expires after a day).
 
-Raw stats will be in all_maps.json
+All data will be store in one file: `csgo-alltime-stats.db`
+
+## Displaying overall stats
 
 `python aggregate_stats.py`
 
@@ -52,11 +58,8 @@ player10 -> Number of Matches: 15, K/D : 0.78, Avg K: 14.47, D: 18.67, A: 4.40
 ## Checking bans in all players you have played with
 
 ```
-python fetch_stats.py
-python resolve_players.py
 python check_bans.py
 ```
-The second and third steps require you to have a steam api key, that can easily be retrieved from steam.
 
 The output will look like this:
 

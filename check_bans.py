@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import requests
 from dotmap import DotMap
 from tinydb import Query, TinyDB
