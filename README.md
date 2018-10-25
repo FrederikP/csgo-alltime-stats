@@ -19,11 +19,15 @@ Clone this repository.
 
 Install dependencies. I recommend using virtualenv to create a dedicated environment.
 
-`pip install requests rsa beautifulsoup4 dotmap progressbar2 tinydb`
+```
+pip install requests rsa beautifulsoup4 dotmap progressbar2 tinydb
+```
 
 ## Fetching data
 
-`python fetch_stats.py`
+```
+python fetch_stats.py
+```
 
 Enter api key, username, password and steam guard two factor code or email auth code.
 A progress bar will be shown, because the first time you run this, this can take a while.
@@ -35,7 +39,9 @@ All data will be store in one file: `csgo-alltime-stats.db`
 
 ## Displaying overall stats
 
-`python aggregate_stats.py`
+```
+python aggregate_stats.py
+```
 
 Will show a simple overview of the 10 players with most matches (you (and your friends)).
 **This is very much work in progress**
