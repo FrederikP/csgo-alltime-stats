@@ -1,14 +1,20 @@
-import json
-
 import numpy as np
 from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure, output_file, show
 from bokeh.transform import jitter
 from dotmap import DotMap
 from pandas import DataFrame, Grouper, to_datetime
+from tinydb import Query, TinyDB
 
-with open('all_maps.json') as data_file:
-    map_data = json.load(data_file)
+
+database_file = 'csgo-alltime-stats.db'
+db = TinyDB(database_file)
+
+match_table = db.table('matches')
+player_table = db.table('players')
+
+
+map_data = match_table.all()
 
 map_data_2 = []
 

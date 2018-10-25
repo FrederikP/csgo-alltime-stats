@@ -1,12 +1,18 @@
 from __future__ import print_function
 
-import json
 from itertools import groupby
 
 from dotmap import DotMap
+from tinydb import Query, TinyDB
 
-with open('all_maps.json') as all_maps_file:
-    all_maps = json.load(all_maps_file)
+database_file = 'csgo-alltime-stats.db'
+db = TinyDB(database_file)
+
+match_table = db.table('matches')
+player_table = db.table('players')
+
+
+all_maps = match_table.all()
 
 all_maps_2 = []
 

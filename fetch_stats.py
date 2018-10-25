@@ -1,17 +1,27 @@
 from __future__ import print_function
 
 import getpass
-import json
 import re
 import sys
 from base64 import b64encode
 
+import progressbar
 import requests
 import rsa
 from bs4 import BeautifulSoup
 from dotmap import DotMap
+from tinydb import Query, TinyDB
 
-cookie_file_name = '.cookie'
+
+STEAM_ID_REGEX = r'[0-9]{17}'
+id_regex = re.compile(STEAM_ID_REGEX)
+id_resolve_url = "https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key={0}&vanityurl={1}"
+
+database_file = 'csgo-alltime-stats.db'
+db = TinyDB(database_file)
+
+match_table = db.table('matches')
+player_table = db.table('players')
 
 def get_encrypted_password(user, password):
     rsa_key_response = DotMap(requests.post('https://steamcommunity.com/login/home/getrsakey/', data={ 'username': user }).json())
@@ -60,12 +70,12 @@ def login():
         print('Failed to log in with message: {0}'.format(login_response.message))
         sys.exit(1)
 
-    with open(cookie_file_name, 'w') as cookie_file:
-        json.dump(login_response, cookie_file)
+    cookie_query = Query()
+    db.upsert({'id': 'cookie', 'data': login_response.toDict()}, cookie_query.id == 'cookie')
 
 def get_initial_page():
-    with open(cookie_file_name) as cookie_file:
-        login_data = DotMap(json.load(cookie_file))
+    cookie_query = Query()
+    login_data = DotMap(db.get(cookie_query.id == 'cookie')['data'])
     steamid = login_data.transfer_parameters.steamid
     cookies = []
     sessionid = login_data.transfer_parameters.auth
@@ -96,10 +106,28 @@ def get_initial_page():
 
     response = requests.get(initial_url, headers=headers, allow_redirects=False)
     return response, headers, sessionid, steamid
+
+
+def get_api_key():
+    api_key_query = Query()
+    api_key_entry = db.get(api_key_query.id == 'api_key')
+    if not api_key_entry:
+        api_key = input('Enter steam api key (get it at  https://steamcommunity.com/dev/apikey): ')
+        db.insert({'id': 'api_key', 'key': api_key})
+    api_key_query = Query()
+    return db.get(api_key_query.id == 'api_key')['key']
+
+
+api_key = get_api_key()
+while requests.get('http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key={0}&appid=218620'.format(api_key)).status_code == 401:
+    print('Api key invalid. Please re-enter')
+    api_key = get_api_key()
+
 needs_login = False
-try:
+cookie_query = Query()
+if db.get(cookie_query.id == 'cookie'):
     response, headers, sessionid, steamid = get_initial_page()
-except FileNotFoundError:
+else:
     needs_login = True
 
 if needs_login or response.status_code != 200:
@@ -115,7 +143,27 @@ def parse_players(rows):
         columns = row.find_all('td')
         player_column = columns[0]
         player.name = player_column.get_text().strip()
-        player.id = player_column.find('a')['href'].split('/')[-1]
+        profile_id = player_column.find('a')['href'].split('/')[-1]
+        if id_regex.match(profile_id):
+            player_query = Query()
+            existing_player = player_table.get(player_query.id == profile_id)
+            if not existing_player:
+                player_table.insert({'id': profile_id, 'profile_id': profile_id})
+            steamid = profile_id
+        else:
+            player_query = Query()
+            existing_player =  player_table.get(player_query.profile_id == profile_id)
+            if existing_player:
+                steamid = existing_player['id']
+            else:
+                response = DotMap(requests.get(id_resolve_url.format(api_key, profile_id)).json()).response
+                if response.success == 1:
+                    steamid = response.steamid
+                    player_table.insert({'id': steamid, 'profile_id': profile_id})
+                else:
+                    print('Could not resolve steamid for {0}'.format(profile_id))
+                    sys.exit(1)
+        player.id = steamid
         player.ping = int(columns[1].get_text())
         player.kills = int(columns[2].get_text())
         player.assists = int(columns[3].get_text())
@@ -136,20 +184,23 @@ def parse_players(rows):
         players.append(player)
     return players
 
-def parse_table(html_doc):
+def parse_table(html_doc, bar):
     soup = BeautifulSoup(html_doc, 'html.parser')
 
     map_tables = soup.find_all('table', {'class': 'csgo_scoreboard_inner_left'})
     score_tables = soup.find_all('table', {'class': 'csgo_scoreboard_inner_right'})
 
-    maps = []
-
     for idx in range(len(map_tables)):
+        bar.update(bar.value + 1)
         map_data = DotMap()
         map_table = map_tables[idx]
         map_rows = map_table.find_all('td')
         map_data.map = map_rows[0].get_text().lower().replace('competitive', '').strip()
         map_data.date = map_rows[1].get_text().strip()
+        match_query = Query()
+        existing_match = match_table.search(match_query.date == map_data.date)
+        if existing_match:
+            continue
         map_data.wait_time = map_rows[2].get_text().lower().replace('wait time:', '').strip()
         map_data.match_duration = map_rows[3].get_text().lower().replace('match duration:', '').strip()
 
@@ -161,36 +212,41 @@ def parse_table(html_doc):
         map_data.team1.players = parse_players(score_rows[1:6])
         map_data.team2.score = int(team_2_score)
         map_data.team2.players = parse_players(score_rows[7:])
+        match_table.insert(map_data.toDict())
 
-        maps.append(map_data)
-    return maps
+count_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730/?tab=matchmaking'
+response = requests.get(count_url, headers=headers, allow_redirects=False)
+soup = BeautifulSoup(response.text, 'html.parser')
 
-all_maps = []
-all_maps.extend(parse_table(first_page))
+table = soup.find('table', {'class': 'generic_kv_table'})
+tds = table.find_all('tr')[1].find_all('td')
+wins = int(tds[1].get_text())
+ties = int(tds[2].get_text())
+losses = int(tds[3].get_text())
+total_matches = wins + ties + losses
 
-match = re.search(r"var g_sGcContinueToken = '([0-9]*)';", first_page)
-if match:
-    continue_token = match.group(1)
-else:
-    continue_token = None
+print('Loading {0} matches ({1} won, {2} tied, {3} lost)'.format(total_matches, wins, ties, losses))
 
-while continue_token:
-    next_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)
-    print('Loading next page...')
-    response = requests.get(next_url, headers=headers)
-    as_json = response.json()
-    if not as_json['success']:
-        break
-    html = as_json['html']
 
-    all_maps.extend(parse_table(html))
-
-    if 'continue_token' in as_json:
-        continue_token = as_json['continue_token']
+with progressbar.ProgressBar(max_value=total_matches) as bar:
+    parse_table(first_page, bar)
+    match = re.search(r"var g_sGcContinueToken = '([0-9]*)';", first_page)
+    if match:
+        continue_token = match.group(1)
     else:
-        break
+        continue_token = None
 
-print('Saving data of {0} maps.'.format(len(all_maps)))
+    while continue_token:
+        next_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)
+        response = requests.get(next_url, headers=headers)
+        as_json = response.json()
+        if not as_json['success']:
+            break
+        html = as_json['html']
 
-with open('all_maps.json', 'w') as all_maps_file:
-    json.dump(all_maps, all_maps_file)
+        parse_table(html, bar)
+
+        if 'continue_token' in as_json:
+            continue_token = as_json['continue_token']
+        else:
+            break

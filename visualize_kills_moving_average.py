@@ -1,4 +1,3 @@
-import json
 from itertools import groupby, cycle
 
 import numpy as np
@@ -8,12 +7,20 @@ from bokeh.plotting import figure, output_file, show
 from bokeh.transform import jitter
 from dotmap import DotMap
 from pandas import DataFrame, Grouper, to_datetime
+from tinydb import Query, TinyDB
+
+
+database_file = 'csgo-alltime-stats.db'
+db = TinyDB(database_file)
+
+match_table = db.table('matches')
+player_table = db.table('players')
+
+
+map_data = match_table.all()
 
 def color_gen():
     yield from cycle(Category10[10])
-
-with open('all_maps.json') as data_file:
-    map_data = json.load(data_file)
 
 
 map_data_2 = []
