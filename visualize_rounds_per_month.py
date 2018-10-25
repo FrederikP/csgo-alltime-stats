@@ -4,25 +4,11 @@ from bokeh.plotting import figure, output_file, show
 from bokeh.transform import jitter
 from dotmap import DotMap
 from pandas import DataFrame, Grouper, to_datetime
-from tinydb import Query, TinyDB
+from csgo_alltime_stats.db import CsgoDatabase
 
 
-database_file = 'csgo-alltime-stats.db'
-db = TinyDB(database_file)
-
-match_table = db.table('matches')
-player_table = db.table('players')
-
-
-map_data = match_table.all()
-
-map_data_2 = []
-
-for element in map_data:
-    the_map = DotMap(element)
-    map_data_2.append(the_map)
-
-map_data = map_data_2
+db = CsgoDatabase()
+map_data = db.get_all_matches()
 
 data = [{'date': map_entry.date, 'rounds': map_entry.team1.score + map_entry.team2.score} for map_entry in map_data]
 

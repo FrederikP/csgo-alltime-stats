@@ -8,30 +8,16 @@ from bokeh.plotting import figure, output_file, show
 from bokeh.transform import jitter
 from dotmap import DotMap
 from pandas import DataFrame, Grouper, to_datetime
-from tinydb import Query, TinyDB
 
-
-database_file = 'csgo-alltime-stats.db'
-db = TinyDB(database_file)
-
-match_table = db.table('matches')
-player_table = db.table('players')
-
-
-map_data = match_table.all()
+from csgo_alltime_stats.db import CsgoDatabase
 
 
 def color_gen():
     yield from cycle(Category10[10])
 
 
-map_data_2 = []
-
-for element in map_data:
-    the_map = DotMap(element)
-    map_data_2.append(the_map)
-
-map_data = map_data_2
+db = CsgoDatabase()
+map_data = db.get_all_matches()
 
 player_scores = [DotMap({'score': player, 'date': the_map.date}) for the_map in map_data for player in the_map.team1.players + the_map.team2.players]
 

@@ -3,24 +3,11 @@ from __future__ import print_function
 from itertools import groupby
 
 from dotmap import DotMap
-from tinydb import Query, TinyDB
 
-database_file = 'csgo-alltime-stats.db'
-db = TinyDB(database_file)
+from csgo_alltime_stats.db import CsgoDatabase
 
-match_table = db.table('matches')
-player_table = db.table('players')
-
-
-all_maps = match_table.all()
-
-all_maps_2 = []
-
-for element in all_maps:
-    the_map = DotMap(element)
-    all_maps_2.append(the_map)
-
-all_maps = all_maps_2
+db = CsgoDatabase()
+all_maps = db.get_all_matches()
 
 player_scores = [player for the_map in all_maps for player in the_map.team1.players + the_map.team2.players]
 

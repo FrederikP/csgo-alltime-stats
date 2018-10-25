@@ -2,15 +2,13 @@ from __future__ import print_function
 
 import requests
 from dotmap import DotMap
-from tinydb import Query, TinyDB
 
-database_file = 'csgo-alltime-stats.db'
-db = TinyDB(database_file)
+from csgo_alltime_stats.db import CsgoDatabase
 
-match_table = db.table('matches')
-player_table = db.table('players')
 
-player_ids = [player['id'] for player in player_table.all()]
+db = CsgoDatabase()
+
+player_ids = [player['id'] for player in db.get_all_players()]
 
 
 def get_api_key():

@@ -1,3 +1,4 @@
+import json
 from itertools import groupby, cycle
 
 import numpy as np
@@ -11,11 +12,12 @@ from pandas import DataFrame, Grouper, to_datetime
 from csgo_alltime_stats.db import CsgoDatabase
 
 
-def color_gen():
-    yield from cycle(Category10[10])
-
 db = CsgoDatabase()
 map_data = db.get_all_matches()
+
+
+def color_gen():
+    yield from cycle(Category10[10])
 
 player_scores = [DotMap({'score': player, 'date': the_map.date}) for the_map in map_data for player in the_map.team1.players + the_map.team2.players]
 
