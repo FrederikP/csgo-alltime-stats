@@ -2,6 +2,7 @@ from dotmap import DotMap
 from tinydb import Query, TinyDB
 
 API_KEY_ID = 'api_key'
+COOKIE_ID = 'cookie'
 
 class CsgoDatabase():
 
@@ -30,4 +31,33 @@ class CsgoDatabase():
     def set_api_key(self, api_key):
         api_key_query = Query()
         self._db.upsert({'id': API_KEY_ID, 'key': api_key}, api_key_query.id == API_KEY_ID)
-            
+    
+    def get_cookie(self):
+        cookie_query = Query()
+        cookie_entry = self._db.get(cookie_query.id == COOKIE_ID)
+        cookie = None
+        if cookie_entry:
+            cookie = cookie_entry['data']
+        return cookie
+
+    def set_cookie(self, cookie):
+        cookie_query = Query()
+        self._db.upsert({'id': COOKIE_ID, 'data': cookie}, cookie_query.id == COOKIE_ID)
+
+    def get_match(self, match_date):
+        match_query = Query()
+        return self._match_table.search(match_query.date == match_date)
+
+    def add_match(self, match):
+        self._match_table.insert(match)
+
+    def get_player_by_steamid(self, steamid):
+        player_query = Query()
+        return self._player_table.get(player_query.id == steamid)
+
+    def get_player_by_profile_id(self, profile_id):
+        player_query = Query()
+        return self._player_table.get(player_query.profile_id == profile_id)
+
+    def add_player(self, steamid, profile_id):
+        self._player_table.insert({'id': steamid, 'profile_id': profile_id})
