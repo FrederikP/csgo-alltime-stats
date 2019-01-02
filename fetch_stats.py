@@ -1,17 +1,18 @@
+
 from __future__ import print_function
 
 import re
+from json import JSONDecodeError
 
 import progressbar
 import requests
-
-
 from bs4 import BeautifulSoup
 from dotmap import DotMap
 
-
 from csgo_alltime_stats.db import CsgoDatabase
-from csgo_alltime_stats.util import get_api_key, get_initial_page, login, parse_players, parse_table
+from csgo_alltime_stats.util import get_api_key, get_initial_page, login, \
+    parse_players, parse_table
+
 
 db = CsgoDatabase()
 
@@ -49,12 +50,24 @@ with progressbar.ProgressBar(max_value=total_matches) as bar:
     if match:
         continue_token = match.group(1)
     else:
+        print('Could not find continuation token. Please restart script')
         continue_token = None
+    
+    retries = 0
 
     while continue_token:
         next_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)
         response = requests.get(next_url, headers=headers)
-        as_json = response.json()
+        try:
+            as_json = response.json()
+        except JSONDecodeError:
+            if retries < 3:
+                retries = retries + 1
+                continue
+            else:
+                print('ERROR: Steam request failed multiple times.')
+                break
+        retries = 0
         if not as_json['success']:
             break
         html = as_json['html']
