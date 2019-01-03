@@ -28,6 +28,9 @@ def get_api_key(db):
 def get_initial_page(db):
     login_data = DotMap(db.get_cookie())
     steamid = login_data.transfer_parameters.steamid
+    api_key = db.get_api_key()
+    summary = requests.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={0}&steamids={1}'.format(api_key, steamid)).json()
+    profile_url = summary['response']['players'][0]['profileurl']
     cookies = []
     sessionid = login_data.transfer_parameters.auth
     cookies.append({
@@ -53,10 +56,10 @@ def get_initial_page(db):
         'Cookie': cookies_all
     }
 
-    initial_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730/?tab=matchhistorycompetitive'
+    initial_url = profile_url + '/gcpd/730/?tab=matchhistorycompetitive'
 
     response = requests.get(initial_url, headers=headers, allow_redirects=False)
-    return response, headers, sessionid, steamid
+    return response, headers, sessionid, profile_url
 
 def get_encrypted_password(user, password):
     rsa_key_response = DotMap(requests.post('https://steamcommunity.com/login/home/getrsakey/', data={ 'username': user }).json())

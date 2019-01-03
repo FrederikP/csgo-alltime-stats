@@ -20,17 +20,17 @@ api_key = get_api_key(db)
 
 needs_login = False
 if db.get_cookie():
-    response, headers, sessionid, steamid = get_initial_page(db)
+    response, headers, sessionid, profile_url = get_initial_page(db)
 else:
     needs_login = True
 
 if needs_login or response.status_code != 200:
     login(db)
-    response, headers, sessionid, steamid = get_initial_page(db)
+    response, headers, sessionid, profile_url = get_initial_page(db)
 
 first_page = response.text
 
-count_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730/?tab=matchmaking'
+count_url = profile_url + '/gcpd/730/?tab=matchmaking'
 response = requests.get(count_url, headers=headers, allow_redirects=False)
 soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -56,7 +56,7 @@ with progressbar.ProgressBar(max_value=total_matches) as bar:
     retries = 0
 
     while continue_token:
-        next_url = 'https://steamcommunity.com/profiles/' + steamid + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)
+        next_url = profile_url + '/gcpd/730?ajax=1&tab=matchhistorycompetitive&continue_token={0}&sessionid={1}'.format(continue_token, sessionid)
         response = requests.get(next_url, headers=headers)
         try:
             as_json = response.json()
